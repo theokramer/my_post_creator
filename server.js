@@ -138,6 +138,7 @@ app.post('/api/generate', async (req, res) => {
         console.log(`[API] Starting browser for render...`);
         browser = await puppeteer.launch({
             headless: 'new',
+            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || puppeteer.executablePath(),
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
