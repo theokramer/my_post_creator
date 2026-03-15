@@ -8,15 +8,48 @@ const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const db = require('./db');
+
+const isProd = process.env.NODE_ENV === 'production';
+const requiredEnv = ['JWT_SECRET', 'CLIENT_URL', 'STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET'];
+const missingEnv = requiredEnv.filter((key) => !process.env[key]);
+if (missingEnv.length) {
+    console.warn(`[Config] Missing required env vars: ${missingEnv.join(', ')}`);
+    if (isProd) {
+        console.error('[Config] Refusing to start without required production env vars.');
+        process.exit(1);
+    }
+}
+
+const stripeKey = process.env.STRIPE_SECRET_KEY || '';
+const allowTestStripe = process.env.STRIPE_ALLOW_TEST === 'true';
+if (stripeKey.startsWith('sk_test_') && !allowTestStripe) {
+    const msg = '[Stripe] Test key detected. Provide a live key to disable sandbox mode.';
+    if (isProd) {
+        console.error(msg);
+        process.exit(1);
+    } else {
+        console.warn(msg);
+    }
+}
+const stripe = require('stripe')(stripeKey);
+const stripeEnabled = Boolean(stripeKey && process.env.STRIPE_WEBHOOK_SECRET);
+const PORT = process.env.PORT || 3000;
+const SUBPATH = '/viralstack';
+const CLIENT_URL = process.env.CLIENT_URL || `http://localhost:${PORT}${SUBPATH}`;
+let CLIENT_ORIGIN = '';
+try {
+    CLIENT_ORIGIN = new URL(CLIENT_URL).origin;
+} catch {
+    CLIENT_ORIGIN = '';
+}
 
 // --- Email Sending (via Resend API) ---
 // We use the HTTP API instead of SMTP to bypass VPS port blocks.
 async function sendVerificationEmail(email, token) {
     const api_key = process.env.SMTP_PASS; // Using the key from your .env
     const from_email = process.env.SMTP_FROM || 'ViralStack <noreply@kramerapps.de>';
-    const verifyUrl = `${process.env.CLIENT_URL}/api/verify-email?token=${token}`;
+    const verifyUrl = `${CLIENT_URL}/api/verify-email?token=${token}`;
 
     if (!api_key || api_key.startsWith('your_')) {
         console.warn('[Email] Skipping email send: No valid API key in SMTP_PASS');
@@ -35,13 +68,13 @@ async function sendVerificationEmail(email, token) {
                 to: [email],
                 subject: 'Verify your ViralStack account',
                 html: `
-                    <div style="font-family: 'Inter', Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
+                    <div style="font-family: 'Manrope', Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
                         <div style="text-align: center; margin-bottom: 32px;">
-                            <div style="display: inline-block; background: linear-gradient(135deg, #a855f7, #06b6d4); width: 48px; height: 48px; border-radius: 12px; line-height: 48px; font-size: 24px; color: white;">&#9889;</div>
+                            <div style="display: inline-block; background: linear-gradient(135deg, #0f766e, #f97316); width: 48px; height: 48px; border-radius: 12px; line-height: 48px; font-size: 24px; color: white;">&#9889;</div>
                             <h1 style="font-size: 22px; font-weight: 700; color: #111; margin: 16px 0 4px;">Welcome to ViralStack</h1>
                             <p style="color: #666; font-size: 14px;">Verify your email to get started</p>
                         </div>
-                        <a href="${verifyUrl}" style="display: block; text-align: center; padding: 14px 28px; background: linear-gradient(135deg, #a855f7, #06b6d4); color: #fff; text-decoration: none; border-radius: 10px; font-weight: 700; font-size: 15px; margin: 24px 0;">Verify Email Address</a>
+                        <a href="${verifyUrl}" style="display: block; text-align: center; padding: 14px 28px; background: linear-gradient(135deg, #0f766e, #f97316); color: #fff; text-decoration: none; border-radius: 10px; font-weight: 700; font-size: 15px; margin: 24px 0;">Verify Email Address</a>
                         <p style="color: #999; font-size: 12px; text-align: center;">If you didn't create this account, you can ignore this email.</p>
                     </div>
                 `
@@ -58,10 +91,29 @@ async function sendVerificationEmail(email, token) {
 }
 
 const app = express();
-const PORT = process.env.PORT || 3000;
-const SUBPATH = '/viralstack';
 
-app.use(cors());
+app.disable('x-powered-by');
+app.set('trust proxy', 1);
+
+const allowedOrigins = (process.env.CORS_ORIGINS || CLIENT_ORIGIN || '')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+const corsOptions = {
+    origin: (origin, cb) => {
+        if (!origin || allowedOrigins.length === 0) return cb(null, true);
+        if (allowedOrigins.includes(origin)) return cb(null, true);
+        return cb(new Error('Not allowed by CORS'));
+    }
+};
+app.use(cors(corsOptions));
+app.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+    next();
+});
 app.use((req, res, next) => {
     console.log(`[Request] ${req.method} ${req.url}`);
     next();
@@ -69,6 +121,9 @@ app.use((req, res, next) => {
 
 // --- Stripe Webhook MUST be before express.json() ---
 app.post(`${SUBPATH}/api/webhook`, express.raw({type: 'application/json'}), (req, res) => {
+    if (!stripeEnabled) {
+        return res.status(503).send('Stripe is not configured');
+    }
     const sig = req.headers['stripe-signature'];
     let event;
     try {
@@ -108,7 +163,16 @@ app.use(express.json({ limit: '50mb' }));
 app.get('/', (req, res) => res.send('ViralStack Server is running. Access via /viralstack'));
 
 // Serve the frontend static files
-app.use(SUBPATH, express.static(path.join(__dirname), { index: 'index.html' }));
+const staticOptions = isProd ? {
+    index: 'index.html',
+    maxAge: '7d',
+    setHeaders: (res, filePath) => {
+        if (filePath.endsWith('index.html')) {
+            res.setHeader('Cache-Control', 'no-store');
+        }
+    }
+} : { index: 'index.html' };
+app.use(SUBPATH, express.static(path.join(__dirname), staticOptions));
 
 // Specific handler for the subpath root to ensure index.html is served
 app.get(SUBPATH, (req, res) => {
@@ -181,7 +245,7 @@ app.get(`${SUBPATH}/api/verify-email`, (req, res) => {
     if (!user) return res.status(400).send('Invalid or expired token');
     db.prepare('UPDATE users SET email_verified = 1, verification_token = NULL WHERE id = ?').run(user.id);
     console.log(`[Email] User ${user.id} verified their email`);
-    res.redirect(`${process.env.CLIENT_URL}?verified=1`);
+    res.redirect(`${CLIENT_URL}?verified=1`);
 });
 
 app.post(`${SUBPATH}/api/resend-verification`, requireAuth, (req, res) => {
@@ -194,6 +258,9 @@ app.post(`${SUBPATH}/api/resend-verification`, requireAuth, (req, res) => {
 
 app.post(`${SUBPATH}/api/create-checkout-session`, requireAuth, async (req, res) => {
     try {
+        if (!stripeEnabled) {
+            return res.status(503).json({ error: 'Stripe is not configured' });
+        }
         const session = await stripe.checkout.sessions.create({
             payment_method_types: ['card'],
             mode: 'payment',
@@ -206,8 +273,8 @@ app.post(`${SUBPATH}/api/create-checkout-session`, requireAuth, async (req, res)
                 },
                 quantity: 1,
             }],
-            success_url: `${process.env.CLIENT_URL}?session_id={CHECKOUT_SESSION_ID}`,
-            cancel_url: `${process.env.CLIENT_URL}`,
+            success_url: `${CLIENT_URL}?session_id={CHECKOUT_SESSION_ID}`,
+            cancel_url: `${CLIENT_URL}`,
         });
         res.json({ url: session.url });
     } catch (err) {
@@ -332,7 +399,7 @@ app.post(`${SUBPATH}/api/generate`, async (req, res) => {
                         const overSettings = payload.override || {};
                         
                         const lineH = s.captionFontSize * 1.4;
-                        ctx.font = `${s.captionFontWeight} ${s.captionFontSize}px 'Inter', sans-serif`;
+                        ctx.font = `${s.captionFontWeight} ${s.captionFontSize}px 'Space Grotesk', sans-serif`;
                         const lines = getWrappedLines(ctx, caption, W - s.captionPadding * 2);
                         const captionAreaHeight = Math.max(300, lines.length * lineH + s.captionPadding * 2);
                         const logoAreaH = s.logoPadding;
