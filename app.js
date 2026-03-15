@@ -191,6 +191,8 @@
         
         if (state.token) { checkAuthSession(); }
         checkStripeRedirect();
+        checkVerifiedRedirect();
+        setupResendVerification();
     }
 
 
@@ -982,6 +984,35 @@
             showToast('Payment successful! Welcome to ViralStack Pro ⚡', 'success', 6000);
             window.history.replaceState({}, document.title, window.location.pathname);
             if (state.token) checkAuthSession();
+        }
+    }
+
+    function checkVerifiedRedirect() {
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('verified') === '1') {
+            showToast('Email verified successfully! ✅', 'success', 5000);
+            window.history.replaceState({}, document.title, window.location.pathname);
+            if (state.token) checkAuthSession();
+        }
+    }
+
+    function setupResendVerification() {
+        const resendLink = document.getElementById('resend-verification');
+        if (resendLink) {
+            resendLink.addEventListener('click', async (e) => {
+                e.preventDefault();
+                if (!state.token) return;
+                try {
+                    const resp = await fetch(`${state.apiPrefix}/resend-verification`, {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${state.token}` }
+                    });
+                    const data = await resp.json();
+                    showToast(data.message || 'Verification email sent!', 'success');
+                } catch (err) {
+                    showToast('Failed to resend. Please try again.', 'error');
+                }
+            });
         }
     }
 

@@ -4,10 +4,49 @@ const puppeteer = require('puppeteer');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const nodemailer = require('nodemailer');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const db = require('./db');
+
+// --- Email Transporter ---
+const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST || 'smtp.resend.com',
+    port: parseInt(process.env.SMTP_PORT || '465'),
+    secure: true,
+    auth: {
+        user: process.env.SMTP_USER || 'resend',
+        pass: process.env.SMTP_PASS
+    }
+});
+const SMTP_FROM = process.env.SMTP_FROM || 'ViralStack <noreply@kramerapps.de>';
+
+async function sendVerificationEmail(email, token) {
+    const verifyUrl = `${process.env.CLIENT_URL}/api/verify-email?token=${token}`;
+    try {
+        await transporter.sendMail({
+            from: SMTP_FROM,
+            to: email,
+            subject: 'Verify your ViralStack account',
+            html: `
+                <div style="font-family: 'Inter', Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
+                    <div style="text-align: center; margin-bottom: 32px;">
+                        <div style="display: inline-block; background: linear-gradient(135deg, #a855f7, #06b6d4); width: 48px; height: 48px; border-radius: 12px; line-height: 48px; font-size: 24px; color: white;">&#9889;</div>
+                        <h1 style="font-size: 22px; font-weight: 700; color: #f0f0f5; margin: 16px 0 4px;">Welcome to ViralStack</h1>
+                        <p style="color: #8b8b9e; font-size: 14px;">Verify your email to get started</p>
+                    </div>
+                    <a href="${verifyUrl}" style="display: block; text-align: center; padding: 14px 28px; background: linear-gradient(135deg, #a855f7, #06b6d4); color: #fff; text-decoration: none; border-radius: 10px; font-weight: 700; font-size: 15px; margin: 24px 0;">Verify Email Address</a>
+                    <p style="color: #4a4a5e; font-size: 12px; text-align: center;">If you didn't create this account, you can ignore this email.</p>
+                </div>
+            `
+        });
+        console.log(`[Email] Verification sent to ${email}`);
+    } catch (err) {
+        console.error('[Email] Failed to send verification:', err.message);
+    }
+}
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -93,9 +132,14 @@ app.post(`${SUBPATH}/api/auth/register`, async (req, res) => {
     if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
     try {
         const hash = await bcrypt.hash(password, 10);
-        const info = db.prepare('INSERT INTO users (email, password_hash) VALUES (?, ?)').run(email, hash);
+        const verificationToken = crypto.randomBytes(32).toString('hex');
+        const info = db.prepare('INSERT INTO users (email, password_hash, verification_token) VALUES (?, ?, ?)').run(email, hash, verificationToken);
         const token = jwt.sign({ id: info.lastInsertRowid }, process.env.JWT_SECRET, { expiresIn: '30d' });
-        res.json({ token, user: { id: info.lastInsertRowid, email, is_pro: 0, batch_processes: 0 } });
+        
+        // Send verification email (non-blocking)
+        sendVerificationEmail(email, verificationToken);
+        
+        res.json({ token, user: { id: info.lastInsertRowid, email, is_pro: 0, email_verified: 0, batch_processes: 0 } });
     } catch (err) {
         if (err.code === 'SQLITE_CONSTRAINT_UNIQUE') return res.status(409).json({ error: 'Email already exists' });
         res.status(500).json({ error: 'Registration failed' });
@@ -110,14 +154,33 @@ app.post(`${SUBPATH}/api/auth/login`, async (req, res) => {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
         const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '30d' });
-        res.json({ token, user: { id: user.id, email: user.email, is_pro: user.is_pro, batch_processes: user.batch_processes } });
+        res.json({ token, user: { id: user.id, email: user.email, is_pro: user.is_pro, email_verified: user.email_verified, batch_processes: user.batch_processes } });
     } catch (err) {
         res.status(500).json({ error: 'Login failed' });
     }
 });
 
 app.get(`${SUBPATH}/api/user/me`, requireAuth, (req, res) => {
-    res.json({ user: { id: req.user.id, email: req.user.email, is_pro: req.user.is_pro, batch_processes: req.user.batch_processes } });
+    res.json({ user: { id: req.user.id, email: req.user.email, is_pro: req.user.is_pro, email_verified: req.user.email_verified, batch_processes: req.user.batch_processes } });
+});
+
+// --- Email Verification ---
+app.get(`${SUBPATH}/api/verify-email`, (req, res) => {
+    const { token } = req.query;
+    if (!token) return res.status(400).send('Missing token');
+    const user = db.prepare('SELECT id FROM users WHERE verification_token = ?').get(token);
+    if (!user) return res.status(400).send('Invalid or expired token');
+    db.prepare('UPDATE users SET email_verified = 1, verification_token = NULL WHERE id = ?').run(user.id);
+    console.log(`[Email] User ${user.id} verified their email`);
+    res.redirect(`${process.env.CLIENT_URL}?verified=1`);
+});
+
+app.post(`${SUBPATH}/api/resend-verification`, requireAuth, (req, res) => {
+    if (req.user.email_verified) return res.json({ message: 'Already verified' });
+    const newToken = crypto.randomBytes(32).toString('hex');
+    db.prepare('UPDATE users SET verification_token = ? WHERE id = ?').run(newToken, req.user.id);
+    sendVerificationEmail(req.user.email, newToken);
+    res.json({ message: 'Verification email sent' });
 });
 
 app.post(`${SUBPATH}/api/create-checkout-session`, requireAuth, async (req, res) => {
