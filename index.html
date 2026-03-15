@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PostCreator — Pro Editor</title>
+    <meta name="description" content="Professional bulk video creator.">
+    <!-- Clean, professional typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Top Navigation Bar -->
+    <nav class="top-nav">
+        <div class="nav-brand">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="4"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
+            <h1>PostCreator Pro</h1>
+        </div>
+        <div class="nav-actions">
+            <div class="header-status" id="header-status">Ready</div>
+            <button class="btn-secondary" id="auth-header-btn">Sign In</button>
+        </div>
+    </nav>
+
+    <main class="editor-layout">
+        <!-- Panel 1: Assets & Input -->
+        <section class="panel panel-assets">
+            <div class="panel-header">
+                <h2>Assets</h2>
+            </div>
+            <div class="panel-content scrollable">
+                <div class="upload-group">
+                    <div class="section-label-row">
+                        <label class="section-label">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                            Captions
+                        </label>
+                        <button class="btn-text-small" id="import-txt-btn">+ Import .txt</button>
+                        <input type="file" id="captions-file-input" accept=".txt,.csv" hidden>
+                    </div>
+                    <textarea id="captions-input" placeholder="One caption per line...&#10;&#10;Line 1 = Video 1&#10;Line 2 = Video 2" rows="6"></textarea>
+                    <div class="meta-row">
+                        <span class="meta-text"><span id="caption-count-num">0</span> detected</span>
+                        <select id="asset-matching" class="select-tiny">
+                            <option value="strict">Strict (1:1)</option>
+                            <option value="loop-images" selected>Loop Images</option>
+                            <option value="loop-captions">Loop Captions</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="upload-group">
+                    <label class="section-label">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                        Media Library
+                    </label>
+                    <div class="drop-zone" id="images-drop-zone">
+                        <input type="file" id="images-input" multiple accept="image/*" hidden>
+                        <p>Drag images or click to browse</p>
+                    </div>
+                    <div id="images-preview" class="files-grid"></div>
+                </div>
+                
+                <div class="upload-group">
+                    <label class="section-label">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                        Brand Logo
+                    </label>
+                    <div class="drop-zone small-zone" id="logo-drop-zone">
+                        <input type="file" id="logo-input" accept="image/*" hidden>
+                        <p>Upload branding</p>
+                    </div>
+                    <div id="logo-preview" class="files-grid"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Panel 2: Interactive Canvas Player -->
+        <section class="panel panel-player">
+            <div class="player-toolbar">
+                <div class="video-switcher">
+                    <button class="btn-icon" id="prev-video-btn" disabled>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+                    </button>
+                    <span class="video-indicator" id="video-indicator">Video 0 / 0</span>
+                    <button class="btn-icon" id="next-video-btn" disabled>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                    </button>
+                </div>
+                <div class="player-hint">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                    Drag directly on canvas to pan image
+                </div>
+            </div>
+            
+            <div class="canvas-container">
+                <div class="canvas-wrapper">
+                    <canvas id="preview-canvas" width="1080" height="1920"></canvas>
+                </div>
+            </div>
+            
+            <div class="player-footer">
+                <div class="export-stats">
+                    <strong>1080 × 1920</strong>
+                    <span class="divider">|</span>
+                    <span id="export-count">0 items ready</span>
+                </div>
+                <button id="generate-btn" class="btn-primary" disabled>
+                    Render All
+                </button>
+            </div>
+        </section>
+
+        <!-- Panel 3: Inspector / Settings -->
+        <section class="panel panel-inspector">
+            <div class="panel-header header-with-actions">
+                <h2>Inspector</h2>
+                <div class="template-actions">
+                    <select id="templates-select" class="select-small">
+                        <optgroup label="System Presets">
+                            <option value="pro-dark">Pro Dark (Default)</option>
+                            <option value="studio-light">Studio Light</option>
+                            <option value="minimalist">Minimalist</option>
+                        </optgroup>
+                        <optgroup label="Saved Configs" id="custom-templates-group">
+                        </optgroup>
+                    </select>
+                    <button class="btn-icon small" id="save-template-btn" title="Save Configuration">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1-2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                    </button>
+                </div>
+            </div>
+
+            <div class="inspector-tabs">
+                <button class="inspect-tab active" data-tab="image">Media</button>
+                <button class="inspect-tab" data-tab="layout">Layout</button>
+                <button class="inspect-tab" data-tab="style">Style</button>
+                <button class="inspect-tab" data-tab="animation">Animate</button>
+            </div>
+
+            <div class="panel-content scrollable">
+                <!-- Image Adjustments -->
+                <div class="inspect-panel active" data-panel="image">
+                    <div class="property-group">
+                        <label>Sizing Mode</label>
+                        <div class="segment-control" id="image-fit-group">
+                            <button class="segment active" data-value="cover">Fill</button>
+                            <button class="segment" data-value="contain">Fit</button>
+                        </div>
+                    </div>
+                    <div class="property-group">
+                        <div class="prop-header">
+                            <label>Zoom / Scale</label>
+                            <span class="prop-val" id="image-scale-value">100%</span>
+                        </div>
+                        <input type="range" id="image-scale" min="10" max="300" value="100" step="1">
+                        <p class="meta-text mt-2">Scale applies globally. Panning is per-video (drag canvas).</p>
+                    </div>
+                    <div class="property-group">
+                        <div class="prop-header">
+                            <label>Rotation</label>
+                            <span class="prop-val" id="image-rotate-value">0°</span>
+                        </div>
+                        <input type="range" id="image-rotate" min="-180" max="180" value="0" step="1">
+                    </div>
+                    <div class="property-group">
+                        <label>Alignment Overrides (This Video)</label>
+                        <div class="segment-control mt-2" id="reset-overrides-group">
+                            <button class="segment" id="center-caption-btn">Reset Text</button>
+                            <button class="segment" id="center-image-btn">Reset Image</button>
+                            <button class="segment" id="center-logo-btn">Reset Logo</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Layout Adjustments -->
+                <div class="inspect-panel" data-panel="layout">
+                    <div class="property-group">
+                        <div class="prop-header">
+                            <label>Caption Padding</label>
+                            <span class="prop-val" id="caption-padding-value">60px</span>
+                        </div>
+                        <input type="range" id="caption-padding" min="0" max="150" value="60" step="5">
+                    </div>
+                    <div class="property-group">
+                        <div class="prop-header">
+                            <label>Logo Scale</label>
+                            <span class="prop-val" id="logo-scale-value">60%</span>
+                        </div>
+                        <input type="range" id="logo-scale" min="10" max="100" value="60" step="5">
+                    </div>
+                    <div class="property-group">
+                        <div class="prop-header">
+                            <label>Logo Area Height</label>
+                            <span class="prop-val" id="logo-padding-value">220px</span>
+                        </div>
+                        <input type="range" id="logo-padding" min="0" max="400" value="220" step="10">
+                    </div>
+                    <div class="property-group">
+                        <div class="prop-header">
+                            <label>Image Margins</label>
+                            <span class="prop-val" id="image-padding-value">0px</span>
+                        </div>
+                        <input type="range" id="image-padding" min="0" max="150" value="0" step="5">
+                    </div>
+                    <div class="property-group">
+                        <div class="prop-header">
+                            <label>Image Rounding</label>
+                            <span class="prop-val" id="image-border-radius-value">0px</span>
+                        </div>
+                        <input type="range" id="image-border-radius" min="0" max="100" value="0" step="2">
+                    </div>
+                </div>
+
+                <!-- Style Adjustments -->
+                <div class="inspect-panel" data-panel="style">
+                    <div class="property-group">
+                        <label>Colors</label>
+                        <div class="color-grid">
+                            <div class="color-item">
+                                <input type="color" id="bg-color" value="#111111">
+                                <span>Base Background</span>
+                            </div>
+                            <div class="color-item">
+                                <input type="color" id="caption-bg-color" value="#1A1A1A">
+                                <span>Header Box</span>
+                            </div>
+                            <div class="color-item">
+                                <input type="color" id="caption-text-color" value="#FFFFFF">
+                                <span>Text Color</span>
+                            </div>
+                            <div class="color-item">
+                                <input type="color" id="image-bg-color" value="#000000">
+                                <span>Media Backing</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="separator"></div>
+                    <div class="property-group">
+                        <label>Typography</label>
+                        <div class="segment-control" id="caption-align-group">
+                            <button class="segment" data-value="left">Left</button>
+                            <button class="segment active" data-value="center">Center</button>
+                            <button class="segment" data-value="right">Right</button>
+                        </div>
+                    </div>
+                    <div class="property-group row">
+                        <div class="flex-1">
+                            <div class="prop-header"><label>Weight</label></div>
+                            <select id="caption-font-weight" class="select-full">
+                                <option value="400">Regular</option>
+                                <option value="500">Medium</option>
+                                <option value="600" selected>Semibold</option>
+                                <option value="700">Bold</option>
+                                <option value="800">Black</option>
+                            </select>
+                        </div>
+                        <div class="flex-1">
+                            <div class="prop-header"><label>Size</label><span class="prop-val" id="font-size-value">46px</span></div>
+                            <input type="range" id="caption-font-size" min="24" max="80" value="46" step="2">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Animation Adjustments -->
+                <div class="inspect-panel" data-panel="animation">
+                    <div class="property-group">
+                        <div class="prop-header">
+                            <label>Total Duration</label>
+                            <span class="prop-val" id="video-duration-value">5.0s</span>
+                        </div>
+                        <input type="range" id="video-duration" min="2" max="15" value="5" step="0.5">
+                    </div>
+                    <div class="property-group">
+                        <div class="prop-header">
+                            <label>Fade Transition</label>
+                            <span class="prop-val" id="fade-duration-value">1.5s</span>
+                        </div>
+                        <input type="range" id="fade-duration" min="0" max="4" value="1.5" step="0.1">
+                        <p class="meta-text mt-2">Time spent fading the image in and out.</p>
+                    </div>
+                    <div class="property-group mt-4">
+                        <label class="toggle-row">
+                            <span>Enable Cinematic Zoom</span>
+                            <input type="checkbox" id="cinema-zoom-toggle">
+                        </label>
+                        <p class="meta-text">Slowly scales the image up by 15% over the duration of the video.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Fullscreen Render Modal overlay -->
+        <div id="render-overlay" class="modal-overlay hidden">
+            <div class="render-dialog">
+                <h3>Rendering Export Queue</h3>
+                <div class="progress-track"><div class="progress-fill" id="progress-bar"></div></div>
+                <p class="meta-text" id="progress-text">Initializing encoder...</p>
+                <div id="downloads-list" class="downloads-list hidden"></div>
+                <div class="dialog-actions mt-4 hidden" id="render-actions">
+                    <button id="download-all-btn" class="btn-primary">Download All (.zip)</button>
+                    <button id="close-render-btn" class="btn-secondary">Close</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Save template modal -->
+        <div id="save-template-modal" class="modal-overlay hidden">
+            <div class="render-dialog">
+                <h3>Save Configuration</h3>
+                <input type="text" id="template-name-input" class="input-full mt-3" placeholder="Configuration Name" maxlength="30">
+                <div class="dialog-actions mt-4">
+                    <button class="btn-secondary" id="cancel-save-btn">Cancel</button>
+                    <button class="btn-primary" id="confirm-save-btn">Save</button>
+                </div>
+            </div>
+        </div>
+        <!-- Auth Modal -->
+        <div id="auth-modal" class="modal-overlay hidden glass-modal">
+            <div class="render-dialog glass-panel">
+                <h3 id="auth-title">Welcome to Pro</h3>
+                <p class="meta-text mb-3" id="auth-subtitle">Sign in or create an account to start automating.</p>
+                <input type="email" id="auth-email" class="input-full mt-3" placeholder="Email Address">
+                <input type="password" id="auth-password" class="input-full mt-3" placeholder="Password">
+                <div class="login-toggle mt-3 meta-text">
+                    <span id="auth-toggle-text">Need an account?</span> <a href="#" id="auth-toggle-link" style="color: #fff;">Sign Up</a>
+                </div>
+                <div class="dialog-actions mt-4">
+                    <button class="btn-secondary" id="close-auth-btn">Cancel</button>
+                    <button class="btn-primary" id="submit-auth-btn">Sign In</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Paywall Modal -->
+        <div id="paywall-modal" class="modal-overlay hidden glass-modal">
+            <div class="render-dialog glass-panel paywall-panel">
+                <div class="paywall-icon">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#a855f7" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                </div>
+                <h3>Upgrade to Pro</h3>
+                <p class="meta-text mb-4 mt-2">You've used your free automation batch. Upgrade to Pro for unlimited batch exports.</p>
+                <div class="price-tag">$9.99 <span>/ one-time</span></div>
+                <ul class="feature-list mt-4 mb-4" style="text-align: left; list-style: none; padding: 0; font-size: 14px; color: #a1a1aa; line-height: 1.8;">
+                    <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" style="margin-right: 8px; vertical-align: middle;"><polyline points="20 6 9 17 4 12"></polyline></svg> Unlimited batch generations</li>
+                    <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" style="margin-right: 8px; vertical-align: middle;"><polyline points="20 6 9 17 4 12"></polyline></svg> Up to 50 assets per batch</li>
+                    <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" style="margin-right: 8px; vertical-align: middle;"><polyline points="20 6 9 17 4 12"></polyline></svg> Forever access, no subscriptions</li>
+                </ul>
+                <div class="dialog-actions mt-4" style="flex-direction: column; gap: 10px;">
+                    <button class="btn-vibrant" id="buy-pro-btn" style="width: 100%;">Buy Pro Now</button>
+                    <button class="btn-text-small" id="close-paywall-btn" style="color: #a1a1aa;">Maybe Later</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <canvas id="render-canvas" width="1080" height="1920" style="display:none;"></canvas>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
