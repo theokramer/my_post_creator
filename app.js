@@ -372,7 +372,7 @@
             let capLen = 1;
             const asset = getIndexedAsset(state.currentVideoIndex);
             if (asset.caption) {
-                previewCtx.font = `${s.captionFontWeight} ${s.captionFontSize}px 'Space Grotesk', sans-serif`;
+                previewCtx.font = `${s.captionFontWeight} ${s.captionFontSize}px 'Instrument Sans', sans-serif`;
                 capLen = getWrappedLines(previewCtx, asset.caption, W - s.captionPadding * 2).length;
             }
             const captionAreaHeight = Math.max(300, capLen * lineH + s.captionPadding * 2);
@@ -590,7 +590,7 @@
         const s = getCurrentSettings();
         const lineH = s.captionFontSize * 1.4;
         
-        ctx.font = `${s.captionFontWeight} ${s.captionFontSize}px 'Space Grotesk', sans-serif`;
+        ctx.font = `${s.captionFontWeight} ${s.captionFontSize}px 'Instrument Sans', sans-serif`;
         const lines = getWrappedLines(ctx, caption, W - s.captionPadding * 2);
         const captionAreaHeight = Math.max(300, lines.length * lineH + s.captionPadding * 2);
         const logoAreaH = s.logoPadding;
@@ -661,7 +661,7 @@
             ctx.fillStyle = s.imageBgColor;
             ctx.beginPath(); ctx.roundRect(pad, imageAreaTop + pad, W - pad * 2, imageAreaHeight - pad * 2, s.imageBorderRadius); ctx.fill();
             
-            ctx.fillStyle = s.captionTextColor; ctx.textAlign = 'center'; ctx.font = `500 24px 'Manrope', sans-serif`;
+            ctx.fillStyle = s.captionTextColor; ctx.textAlign = 'center'; ctx.font = `500 24px 'Instrument Sans', sans-serif`;
             ctx.fillText("Upload imagery to preview", W / 2, imageAreaTop + imageAreaHeight / 2);
         }
 

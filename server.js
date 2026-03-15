@@ -68,13 +68,13 @@ async function sendVerificationEmail(email, token) {
                 to: [email],
                 subject: 'Verify your ViralStack account',
                 html: `
-                    <div style="font-family: 'Manrope', Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
+                    <div style="font-family: 'Instrument Sans', Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
                         <div style="text-align: center; margin-bottom: 32px;">
-                            <div style="display: inline-block; background: linear-gradient(135deg, #0f766e, #f97316); width: 48px; height: 48px; border-radius: 12px; line-height: 48px; font-size: 24px; color: white;">&#9889;</div>
+                            <div style="display: inline-block; background: linear-gradient(135deg, #1f3a5f, #c26b3f); width: 48px; height: 48px; border-radius: 12px; line-height: 48px; font-size: 24px; color: white;">&#9889;</div>
                             <h1 style="font-size: 22px; font-weight: 700; color: #111; margin: 16px 0 4px;">Welcome to ViralStack</h1>
                             <p style="color: #666; font-size: 14px;">Verify your email to get started</p>
                         </div>
-                        <a href="${verifyUrl}" style="display: block; text-align: center; padding: 14px 28px; background: linear-gradient(135deg, #0f766e, #f97316); color: #fff; text-decoration: none; border-radius: 10px; font-weight: 700; font-size: 15px; margin: 24px 0;">Verify Email Address</a>
+                        <a href="${verifyUrl}" style="display: block; text-align: center; padding: 14px 28px; background: linear-gradient(135deg, #1f3a5f, #c26b3f); color: #fff; text-decoration: none; border-radius: 10px; font-weight: 700; font-size: 15px; margin: 24px 0;">Verify Email Address</a>
                         <p style="color: #999; font-size: 12px; text-align: center;">If you didn't create this account, you can ignore this email.</p>
                     </div>
                 `
@@ -399,7 +399,7 @@ app.post(`${SUBPATH}/api/generate`, async (req, res) => {
                         const overSettings = payload.override || {};
                         
                         const lineH = s.captionFontSize * 1.4;
-                        ctx.font = `${s.captionFontWeight} ${s.captionFontSize}px 'Space Grotesk', sans-serif`;
+                        ctx.font = `${s.captionFontWeight} ${s.captionFontSize}px 'Instrument Sans', sans-serif`;
                         const lines = getWrappedLines(ctx, caption, W - s.captionPadding * 2);
                         const captionAreaHeight = Math.max(300, lines.length * lineH + s.captionPadding * 2);
                         const logoAreaH = s.logoPadding;
