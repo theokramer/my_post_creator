@@ -1,4 +1,4 @@
-/* ===== PostCreator App — Pro Editor Edition ===== */
+/* ===== ViralStack Pro Batch Editor ===== */
 
 (function () {
     'use strict';
@@ -17,7 +17,8 @@
         imageFit: 'contain', // 'cover', 'contain'
 
         user: null,
-        token: localStorage.getItem('pc_token') || null
+        token: localStorage.getItem('pc_token') || null,
+        apiPrefix: '/viralstack/api'
     };
 
     // ===== Built-in Templates =====
@@ -173,7 +174,7 @@
         updateCountsAndSync();
         
         if (state.token) { checkAuthSession(); }
-        checkStripeRedirect();
+        // checkStripeRedirect(); // Handled by backend CLIENT_URL now, or we can check params
     }
 
     // ===== 1. Uploads =====
@@ -683,7 +684,7 @@
         generateBtn.disabled = true;
         generateBtn.textContent = 'Checking quota...';
         try {
-            const resp = await fetch('/api/generate/track', {
+            const resp = await fetch(`${state.apiPrefix}/generate/track`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${state.token}` },
                 body: JSON.stringify({ captionCount: n })
@@ -835,8 +836,9 @@
             submitAuthBtn.disabled = true;
             submitAuthBtn.textContent = 'Wait...';
             try {
-                const endpoint = authMode === 'login' ? '/api/auth/login' : '/api/auth/register';
-                const res = await fetch(endpoint, {
+                const isLogin = authMode === 'login';
+                const endpoint = isLogin ? 'login' : 'register';
+                const resp = await fetch(`${state.apiPrefix}/auth/${endpoint}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email, password })
@@ -844,12 +846,12 @@
                 
                 let data;
                 try {
-                    data = await res.json();
+                    data = await resp.json();
                 } catch (parseErr) {
                     throw new Error('Server returned an invalid response. Please ensure you have restarted your Node server to load the latest backend code.');
                 }
                 
-                if (!res.ok) throw new Error(data.error || 'Auth failed');
+                if (!resp.ok) throw new Error(data.error || 'Auth failed');
                 
                 state.token = data.token;
                 state.user = data.user;
@@ -868,12 +870,12 @@
         buyProBtn.addEventListener('click', async () => {
             buyProBtn.disabled = true; buyProBtn.textContent = 'Loading Stripe...';
             try {
-                const res = await fetch('/api/create-checkout-session', {
+                const resp = await fetch(`${state.apiPrefix}/create-checkout-session`, {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${state.token}` }
                 });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error);
+                const data = await resp.json();
+                if (!resp.ok) throw new Error(data.error);
                 window.location.href = data.url;
             } catch (err) {
                 alert('Checkout Error: ' + err.message);
@@ -911,11 +913,11 @@
 
     async function checkAuthSession() {
         try {
-            const res = await fetch('/api/user/me', {
+            const resp = await fetch(`${state.apiPrefix}/user/me`, {
                 headers: { 'Authorization': `Bearer ${state.token}` }
             });
-            if (res.ok) {
-                const data = await res.json();
+            if (resp.ok) {
+                const data = await resp.json();
                 state.user = data.user;
                 updateAuthUI();
             } else {

@@ -13,6 +13,6 @@ services:
       - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
       - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
       - JWT_SECRET=${JWT_SECRET}
-      - CLIENT_URL=${CLIENT_URL}
+      - CLIENT_URL=https://kramerapps.de/viralstack
     volumes:
       - ./data:/data

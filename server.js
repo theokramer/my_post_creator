@@ -11,11 +11,16 @@ const db = require('./db');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const SUBPATH = '/viralstack';
 
 app.use(cors());
+app.use((req, res, next) => {
+    console.log(`[Request] ${req.method} ${req.url}`);
+    next();
+});
 
 // --- Stripe Webhook MUST be before express.json() ---
-app.post('/api/webhook', express.raw({type: 'application/json'}), (req, res) => {
+app.post(`${SUBPATH}/api/webhook`, express.raw({type: 'application/json'}), (req, res) => {
     const sig = req.headers['stripe-signature'];
     let event;
     try {
@@ -25,20 +30,46 @@ app.post('/api/webhook', express.raw({type: 'application/json'}), (req, res) => 
         return res.status(400).send(`Webhook Error: ${err.message}`);
     }
 
-    if (event.type === 'checkout.session.completed') {
-        const session = event.data.object;
-        const userId = session.client_reference_id;
-        if (userId) {
-            console.log(`[Stripe] Upgrading user ${userId} to Pro!`);
-            db.prepare('UPDATE users SET is_pro = 1 WHERE id = ?').run(userId);
+    try {
+        if (event.type === 'checkout.session.completed') {
+            const session = event.data.object;
+            const userId = parseInt(session.client_reference_id, 10);
+            if (!isNaN(userId)) {
+                console.log(`[Stripe Webhook] Upgrading user ID: ${userId} to Pro`);
+                const info = db.prepare('UPDATE users SET is_pro = 1 WHERE id = ?').run(userId);
+                console.log(`[Stripe Webhook] Update changes: ${info.changes}`);
+                if (info.changes > 0) {
+                    console.log(`[Stripe Webhook] Successfully upgraded user ${userId} to Pro!`);
+                } else {
+                    console.warn(`[Stripe Webhook] User ${userId} not found during upgrade.`);
+                }
+            } else {
+                console.warn('[Stripe Webhook] No client_reference_id found in session.');
+            }
         }
+        res.json({ received: true });
+    } catch (err) {
+        console.error('[Stripe Webhook] Error processing event:', err);
+        res.status(500).json({ error: 'Internal server error processing webhook' });
     }
-    res.json({ received: true });
 });
 
 app.use(express.json({ limit: '50mb' }));
-// Serve the frontend static files so Puppeteer can load the canvas logic natively
-app.use(express.static(path.join(__dirname))); 
+
+// Health check for root
+app.get('/', (req, res) => res.send('ViralStack Server is running. Access via /viralstack'));
+
+// Serve the frontend static files
+app.use(SUBPATH, express.static(path.join(__dirname), { index: 'index.html' }));
+
+// Specific handler for the subpath root to ensure index.html is served
+app.get(SUBPATH, (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+app.get(`${SUBPATH}/`, (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
 
 // --- Auth Middleware ---
 const requireAuth = (req, res, next) => {
@@ -49,6 +80,7 @@ const requireAuth = (req, res, next) => {
         const payload = jwt.verify(token, process.env.JWT_SECRET);
         req.user = db.prepare('SELECT * FROM users WHERE id = ?').get(payload.id);
         if (!req.user) throw new Error('User not found');
+        console.log(`[Auth] User ${req.user.id} logged in. is_pro=${req.user.is_pro}`);
         next();
     } catch (err) {
         return res.status(401).json({ error: 'Invalid token' });
@@ -56,7 +88,7 @@ const requireAuth = (req, res, next) => {
 };
 
 // --- API Routes ---
-app.post('/api/auth/register', async (req, res) => {
+app.post(`${SUBPATH}/api/auth/register`, async (req, res) => {
     const { email, password } = req.body;
     if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
     try {
@@ -70,7 +102,7 @@ app.post('/api/auth/register', async (req, res) => {
     }
 });
 
-app.post('/api/auth/login', async (req, res) => {
+app.post(`${SUBPATH}/api/auth/login`, async (req, res) => {
     const { email, password } = req.body;
     try {
         const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
@@ -84,11 +116,11 @@ app.post('/api/auth/login', async (req, res) => {
     }
 });
 
-app.get('/api/user/me', requireAuth, (req, res) => {
+app.get(`${SUBPATH}/api/user/me`, requireAuth, (req, res) => {
     res.json({ user: { id: req.user.id, email: req.user.email, is_pro: req.user.is_pro, batch_processes: req.user.batch_processes } });
 });
 
-app.post('/api/create-checkout-session', requireAuth, async (req, res) => {
+app.post(`${SUBPATH}/api/create-checkout-session`, requireAuth, async (req, res) => {
     try {
         const session = await stripe.checkout.sessions.create({
             payment_method_types: ['card'],
@@ -97,7 +129,7 @@ app.post('/api/create-checkout-session', requireAuth, async (req, res) => {
             line_items: [{
                 price_data: {
                     currency: 'usd',
-                    product_data: { name: 'Pro Editor - Unlimited Batch Automation', description: 'Unlock unlimited batch video generation.' },
+                    product_data: { name: 'ViralStack Pro', description: 'Unlock unlimited batch video generation.' },
                     unit_amount: 999,
                 },
                 quantity: 1,
@@ -112,11 +144,16 @@ app.post('/api/create-checkout-session', requireAuth, async (req, res) => {
     }
 });
 
-app.post('/api/generate/track', requireAuth, (req, res) => {
+app.post(`${SUBPATH}/api/generate/track`, requireAuth, (req, res) => {
     const { captionCount } = req.body;
     
-    if (req.user.is_pro) {
-        if (captionCount > 50) return res.status(400).json({ error: 'Pro limits batch size to 50 at a time to prevent abuse.' });
+    // Robust check for is_pro (check for number 1 or truthy boolean)
+    const isPro = Number(req.user.is_pro) === 1 || req.user.is_pro === true;
+    console.log(`[Track] User ${req.user.id} - is_pro in DB: ${req.user.is_pro}, evaluated as Pro: ${isPro}`);
+
+    if (isPro) {
+        // Increase limit from 50 to 500 for Pro users
+        if (captionCount > 500) return res.status(400).json({ error: 'Pro limits batch size to 500 at a time to prevent server overload.' });
         res.json({ success: true, is_pro: true });
     } else {
         if (req.user.batch_processes >= 1) return res.status(403).json({ error: 'Free tier limit reached. Please upgrade to Pro.', requires_upgrade: true });
@@ -126,7 +163,7 @@ app.post('/api/generate/track', requireAuth, (req, res) => {
 });
 
 
-app.post('/api/generate', async (req, res) => {
+app.post(`${SUBPATH}/api/generate`, async (req, res) => {
     const { caption, imageUrl, logoUrl, settings, override } = req.body;
 
     if (!caption || !imageUrl) {
@@ -149,7 +186,7 @@ app.post('/api/generate', async (req, res) => {
         const page = await browser.newPage();
         
         // We load the exact same frontend the user sees, but we'll inject values via JS
-        await page.goto(`http://localhost:${PORT}/index.html`, { waitUntil: 'networkidle0' });
+        await page.goto(`http://localhost:${PORT}${SUBPATH}/index.html`, { waitUntil: 'networkidle0' });
 
         // Evaluate the payload directly into the browser context
         console.log(`[API] Injecting payload into browser...`);
@@ -366,6 +403,6 @@ app.post('/api/generate', async (req, res) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`Automation API Server running on port ${PORT}`);
-    console.log(`Frontend accessible at http://localhost:${PORT}`);
+    console.log(`ViralStack API Server running on port ${PORT}`);
+    console.log(`Frontend accessible at http://localhost:${PORT}${SUBPATH}`);
 });
