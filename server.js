@@ -11,39 +11,47 @@ const nodemailer = require('nodemailer');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const db = require('./db');
 
-// --- Email Transporter ---
-const SMTP_PORT = parseInt(process.env.SMTP_PORT || '465');
-const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.resend.com',
-    port: SMTP_PORT,
-    secure: SMTP_PORT === 465, // true for 465, false for other ports (like 587)
-    auth: {
-        user: process.env.SMTP_USER || 'resend',
-        pass: process.env.SMTP_PASS
-    }
-});
-const SMTP_FROM = process.env.SMTP_FROM || 'ViralStack <noreply@kramerapps.de>';
-
+// --- Email Sending (via Resend API) ---
+// We use the HTTP API instead of SMTP to bypass VPS port blocks.
 async function sendVerificationEmail(email, token) {
+    const api_key = process.env.SMTP_PASS; // Using the key from your .env
+    const from_email = process.env.SMTP_FROM || 'ViralStack <noreply@kramerapps.de>';
     const verifyUrl = `${process.env.CLIENT_URL}/api/verify-email?token=${token}`;
+
+    if (!api_key || api_key.startsWith('your_')) {
+        console.warn('[Email] Skipping email send: No valid API key in SMTP_PASS');
+        return;
+    }
+
     try {
-        await transporter.sendMail({
-            from: SMTP_FROM,
-            to: email,
-            subject: 'Verify your ViralStack account',
-            html: `
-                <div style="font-family: 'Inter', Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
-                    <div style="text-align: center; margin-bottom: 32px;">
-                        <div style="display: inline-block; background: linear-gradient(135deg, #a855f7, #06b6d4); width: 48px; height: 48px; border-radius: 12px; line-height: 48px; font-size: 24px; color: white;">&#9889;</div>
-                        <h1 style="font-size: 22px; font-weight: 700; color: #f0f0f5; margin: 16px 0 4px;">Welcome to ViralStack</h1>
-                        <p style="color: #8b8b9e; font-size: 14px;">Verify your email to get started</p>
+        const response = await fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${api_key}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                from: from_email,
+                to: [email],
+                subject: 'Verify your ViralStack account',
+                html: `
+                    <div style="font-family: 'Inter', Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
+                        <div style="text-align: center; margin-bottom: 32px;">
+                            <div style="display: inline-block; background: linear-gradient(135deg, #a855f7, #06b6d4); width: 48px; height: 48px; border-radius: 12px; line-height: 48px; font-size: 24px; color: white;">&#9889;</div>
+                            <h1 style="font-size: 22px; font-weight: 700; color: #111; margin: 16px 0 4px;">Welcome to ViralStack</h1>
+                            <p style="color: #666; font-size: 14px;">Verify your email to get started</p>
+                        </div>
+                        <a href="${verifyUrl}" style="display: block; text-align: center; padding: 14px 28px; background: linear-gradient(135deg, #a855f7, #06b6d4); color: #fff; text-decoration: none; border-radius: 10px; font-weight: 700; font-size: 15px; margin: 24px 0;">Verify Email Address</a>
+                        <p style="color: #999; font-size: 12px; text-align: center;">If you didn't create this account, you can ignore this email.</p>
                     </div>
-                    <a href="${verifyUrl}" style="display: block; text-align: center; padding: 14px 28px; background: linear-gradient(135deg, #a855f7, #06b6d4); color: #fff; text-decoration: none; border-radius: 10px; font-weight: 700; font-size: 15px; margin: 24px 0;">Verify Email Address</a>
-                    <p style="color: #4a4a5e; font-size: 12px; text-align: center;">If you didn't create this account, you can ignore this email.</p>
-                </div>
-            `
+                `
+            })
         });
-        console.log(`[Email] Verification sent to ${email}`);
+
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || 'API Error');
+
+        console.log(`[Email] Verification sent to ${email} (ID: ${data.id})`);
     } catch (err) {
         console.error('[Email] Failed to send verification:', err.message);
     }
