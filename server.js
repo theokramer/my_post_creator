@@ -12,10 +12,11 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const db = require('./db');
 
 // --- Email Transporter ---
+const SMTP_PORT = parseInt(process.env.SMTP_PORT || '465');
 const transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST || 'smtp.resend.com',
-    port: parseInt(process.env.SMTP_PORT || '465'),
-    secure: true,
+    port: SMTP_PORT,
+    secure: SMTP_PORT === 465, // true for 465, false for other ports (like 587)
     auth: {
         user: process.env.SMTP_USER || 'resend',
         pass: process.env.SMTP_PASS
