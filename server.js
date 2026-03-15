@@ -130,7 +130,7 @@ app.post(`${SUBPATH}/api/create-checkout-session`, requireAuth, async (req, res)
                 price_data: {
                     currency: 'usd',
                     product_data: { name: 'ViralStack Pro', description: 'Unlock unlimited batch video generation.' },
-                    unit_amount: 999,
+                    unit_amount: 499,
                 },
                 quantity: 1,
             }],

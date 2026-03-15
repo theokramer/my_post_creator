@@ -3,6 +3,22 @@
 (function () {
     'use strict';
 
+    // ===== Toast Notification System =====
+    function showToast(message, type = 'info', duration = 4000) {
+        const container = document.getElementById('toast-container');
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        toast.textContent = message;
+        container.appendChild(toast);
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateY(-10px)';
+            toast.style.transition = 'all 0.3s ease';
+            setTimeout(() => toast.remove(), 300);
+        }, duration);
+    }
+
+
     // ===== App State =====
     const state = {
         captions: [],
@@ -174,8 +190,9 @@
         updateCountsAndSync();
         
         if (state.token) { checkAuthSession(); }
-        // checkStripeRedirect(); // Handled by backend CLIENT_URL now, or we can check params
+        checkStripeRedirect();
     }
+
 
     // ===== 1. Uploads =====
     function setupUploads() {
@@ -707,7 +724,7 @@
         } catch (err) {
             generateBtn.disabled = false;
             generateBtn.textContent = 'Render All';
-            alert('Error checking quota: ' + err.message);
+            showToast('Error checking quota: ' + err.message, 'error');
             return;
         }
         generateBtn.textContent = 'Render All';
@@ -859,7 +876,7 @@
                 updateAuthUI();
                 authModal.classList.add('hidden');
             } catch (err) {
-                alert(err.message);
+                showToast(err.message, 'error');
             }
             submitAuthBtn.disabled = false;
             submitAuthBtn.textContent = authMode === 'login' ? 'Sign In' : 'Sign Up';
@@ -878,7 +895,7 @@
                 if (!resp.ok) throw new Error(data.error);
                 window.location.href = data.url;
             } catch (err) {
-                alert('Checkout Error: ' + err.message);
+                showToast('Checkout Error: ' + err.message, 'error');
                 buyProBtn.disabled = false; buyProBtn.textContent = 'Buy Pro Now';
             }
         });
@@ -894,18 +911,19 @@
     function updateAuthModalUI() {
         if (authMode === 'login') {
             authTitle.textContent = 'Welcome Back';
-            authSubtitle.textContent = 'Sign in to access your videos & quotas.';
+            authSubtitle.textContent = 'Sign in to access your projects.';
             submitAuthBtn.textContent = 'Sign In';
             authToggleText.textContent = 'Need an account?';
             authToggleLink.textContent = 'Sign Up';
         } else {
-            authTitle.textContent = 'Create Pro Account';
-            authSubtitle.textContent = 'Start automating your content today.';
+            authTitle.textContent = 'Create Your Account';
+            authSubtitle.textContent = 'Start creating viral content today.';
             submitAuthBtn.textContent = 'Sign Up';
             authToggleText.textContent = 'Already have an account?';
             authToggleLink.textContent = 'Sign In';
         }
     }
+
 
     function showPaywallModal() {
         paywallModal.classList.remove('hidden');
@@ -933,9 +951,17 @@
             authHeaderBtn.textContent = 'Log Out';
             authHeaderBtn.classList.replace('btn-secondary', 'btn-primary');
             if (state.user.is_pro) {
-                headerStatus.textContent = 'Pro Member';
-                headerStatus.style.background = 'rgba(168, 85, 247, 0.2)';
+                headerStatus.textContent = '⚡ Pro';
+                headerStatus.style.background = 'linear-gradient(135deg, rgba(168,85,247,0.2), rgba(6,182,212,0.15))';
                 headerStatus.style.color = '#d8b4fe';
+                headerStatus.style.borderColor = 'rgba(168,85,247,0.3)';
+            }
+            // Show verification banner if needed
+            const banner = document.getElementById('verification-banner');
+            if (state.user.email_verified === 0 || state.user.email_verified === false) {
+                banner.classList.remove('hidden');
+            } else {
+                banner.classList.add('hidden');
             }
         } else {
             authHeaderBtn.textContent = 'Sign In';
@@ -943,18 +969,22 @@
             headerStatus.textContent = 'Ready';
             headerStatus.style.background = '';
             headerStatus.style.color = '';
+            headerStatus.style.borderColor = '';
+            document.getElementById('verification-banner').classList.add('hidden');
         }
     }
+
 
     function checkStripeRedirect() {
         const urlParams = new URLSearchParams(window.location.search);
         const sid = urlParams.get('session_id');
         if (sid) {
-            alert('Payment Successful! You are now a Pro Member.');
+            showToast('Payment successful! Welcome to ViralStack Pro ⚡', 'success', 6000);
             window.history.replaceState({}, document.title, window.location.pathname);
-            if (state.token) checkAuthSession(); // Refresh profile
+            if (state.token) checkAuthSession();
         }
     }
+
 
     function escapeHtml(str) { const d = document.createElement('div'); d.textContent = str; return d.innerHTML; }
     

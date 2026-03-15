@@ -3,20 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ViralStack — Pro Batch Editor</title>
-    <meta name="description" content="Professional bulk video creator.">
-    <!-- Clean, professional typography -->
+    <title>ViralStack — Batch Video Creator</title>
+    <meta name="description" content="Create stunning batch videos for Instagram, TikTok, and more. Professional bulk video automation.">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%23a855f7'/%3E%3Cstop offset='100%25' stop-color='%2306b6d4'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='8' fill='url(%23g)'/%3E%3Cpath d='M10 8h12l-3 5h5l-10 11 3-8h-5z' fill='white' opacity='0.95'/%3E%3C/svg%3E">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+    <!-- Toast Notifications -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- Email Verification Banner (hidden by default) -->
+    <div class="verification-banner hidden" id="verification-banner">
+        ⚠️ Please verify your email address. Check your inbox for a confirmation link.
+        <a id="resend-verification">Resend</a>
+    </div>
+
     <!-- Top Navigation Bar -->
     <nav class="top-nav">
         <div class="nav-brand">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="4"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
-            <h1>ViralStack Pro</h1>
+            <div class="logo-icon">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M7 4h10l-3 5h5L8 21l3-8H6z" fill="white" opacity="0.95"/></svg>
+            </div>
+            <h1>ViralStack</h1>
         </div>
         <div class="nav-actions">
             <div class="header-status" id="header-status">Ready</div>
@@ -320,8 +331,8 @@
         <!-- Auth Modal -->
         <div id="auth-modal" class="modal-overlay hidden glass-modal">
             <div class="render-dialog glass-panel">
-                <h3 id="auth-title">Welcome to Pro</h3>
-                <p class="meta-text mb-3" id="auth-subtitle">Sign in or create an account to start automating.</p>
+                <h3 id="auth-title">Welcome to ViralStack</h3>
+                <p class="meta-text mb-3" id="auth-subtitle">Sign in or create an account to start creating.</p>
                 <input type="email" id="auth-email" class="input-full mt-3" placeholder="Email Address">
                 <input type="password" id="auth-password" class="input-full mt-3" placeholder="Password">
                 <div class="login-toggle mt-3 meta-text">
@@ -340,9 +351,9 @@
                 <div class="paywall-icon">
                     <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#a855f7" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
                 </div>
-                <h3>Upgrade to Pro</h3>
-                <p class="meta-text mb-4 mt-2">You've used your free automation batch. Upgrade to Pro for unlimited batch exports.</p>
-                <div class="price-tag">$9.99 <span>/ one-time</span></div>
+                <h3>Upgrade to ViralStack Pro</h3>
+                <p class="meta-text mb-4 mt-2">You've used your free batch. Go Pro for unlimited exports and premium features.</p>
+                <div class="price-tag">$4.99 <span>/ one-time</span></div>
                 <ul class="feature-list mt-4 mb-4" style="text-align: left; list-style: none; padding: 0; font-size: 14px; color: #a1a1aa; line-height: 1.8;">
                     <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" style="margin-right: 8px; vertical-align: middle;"><polyline points="20 6 9 17 4 12"></polyline></svg> Unlimited batch generations</li>
                     <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" style="margin-right: 8px; vertical-align: middle;"><polyline points="20 6 9 17 4 12"></polyline></svg> Up to 50 assets per batch</li>
