@@ -100,18 +100,6 @@
     const logoDropZone = $('#logo-drop-zone');
     const logoInput = $('#logo-input');
     const logoPreview = $('#logo-preview');
-    const aiIdea = $('#ai-idea');
-    const aiCount = $('#ai-count');
-    const aiTemplate = $('#ai-template');
-    const aiStyle = $('#ai-style');
-    const aiLogoToggle = $('#ai-logo-toggle');
-    const aiAppendToggle = $('#ai-append-toggle');
-    const aiGenerateBtn = $('#ai-generate-btn');
-    const creditsBalance = $('#credits-balance');
-    const buyCredits100 = $('#buy-credits-100');
-    const buyCredits1000 = $('#buy-credits-1000');
-    const buyCredits10000 = $('#buy-credits-10000');
-    const buyProInlineBtn = $('#buy-pro-inline-btn');
 
     // Panel 2: Player & Switcher
     const prevVideoBtn = $('#prev-video-btn');
@@ -188,7 +176,6 @@
 
     function init() {
         setupUploads();
-        setupAIStudio();
         setupPlayerControls();
         setupInspector();
         setupDirectCanvasInteraction();
@@ -255,192 +242,6 @@
             const url = URL.createObjectURL(file); const img = new Image();
             img.onload = () => { state.logo = { file, url, img }; renderLogoThumb(); updateCountsAndSync(); };
             img.src = url;
-        });
-    }
-
-    function setupAIStudio() {
-        if (!aiGenerateBtn || !aiIdea) return;
-
-        aiGenerateBtn.addEventListener('click', async () => {
-            const idea = aiIdea.value.trim();
-            if (!idea) {
-                showToast('Add a short idea to generate posts.', 'error');
-                return;
-            }
-            if (!state.token) {
-                showAuthModal('Sign in to auto-generate posts');
-                return;
-            }
-
-            const countRaw = parseInt(aiCount?.value || '0', 10);
-            const count = Math.max(1, Math.min(20, Number.isFinite(countRaw) ? countRaw : 6));
-            if (aiCount) aiCount.value = count;
-
-            aiGenerateBtn.disabled = true;
-            const originalLabel = aiGenerateBtn.textContent;
-            aiGenerateBtn.textContent = 'Generating...';
-            try {
-                const resp = await fetch(`${state.apiPrefix}/ai/generate`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${state.token}`
-                    },
-                    body: JSON.stringify({
-                        idea,
-                        count,
-                        template: aiTemplate?.value || 'custom',
-                        style: aiStyle?.value || '',
-                        includeLogo: !!aiLogoToggle?.checked
-                    })
-                });
-
-                const data = await resp.json();
-                if (!resp.ok) {
-                    if (resp.status === 402 && typeof data.credits_required === 'number') {
-                        throw new Error(`Not enough credits. Need ${data.credits_required}, have ${data.credits_available || 0}.`);
-                    }
-                    throw new Error(data.error || 'AI generation failed');
-                }
-
-                const appendMode = !!aiAppendToggle?.checked;
-                if (!appendMode) resetAssets();
-
-                const incomingCaptions = Array.isArray(data.captions) ? data.captions : [];
-                if (appendMode) state.captions = state.captions.concat(incomingCaptions);
-                else state.captions = incomingCaptions;
-
-                captionsInput.value = state.captions.join('\n');
-                captionsInput.dispatchEvent(new Event('input'));
-
-                if (Array.isArray(data.images)) {
-                    for (let i = 0; i < data.images.length; i++) {
-                        const dataUrl = data.images[i];
-                        if (!dataUrl) continue;
-                        await addImageFromDataUrl(dataUrl, `ai_image_${Date.now()}_${i}.png`);
-                    }
-                }
-
-                if (data.logo) {
-                    await setLogoFromDataUrl(data.logo, `ai_logo_${Date.now()}.png`);
-                }
-
-                if (typeof data.credits === 'number') {
-                    state.user = state.user || {};
-                    state.user.credits = data.credits;
-                    updateCreditsUI();
-                }
-                showToast('AI assets added. You can tweak anything manually.', 'success');
-            } catch (err) {
-                showToast(err.message || 'AI generation failed', 'error');
-            } finally {
-                aiGenerateBtn.disabled = false;
-                aiGenerateBtn.textContent = originalLabel;
-            }
-        });
-
-        const attachCreditPurchase = (btn, pack) => {
-            if (!btn) return;
-            btn.addEventListener('click', async () => {
-                if (!state.token) {
-                    showAuthModal('Sign in to buy credits');
-                    return;
-                }
-                btn.disabled = true;
-                const original = btn.textContent;
-                btn.textContent = 'Loading...';
-                try {
-                    const resp = await fetch(`${state.apiPrefix}/buy-credits`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${state.token}`
-                        },
-                        body: JSON.stringify({ pack })
-                    });
-                    const data = await resp.json();
-                    if (!resp.ok) throw new Error(data.error || 'Checkout failed');
-                    window.location.href = data.url;
-                } catch (err) {
-                    showToast(err.message || 'Checkout failed', 'error');
-                } finally {
-                    btn.disabled = false;
-                    btn.textContent = original;
-                }
-            });
-        };
-
-        attachCreditPurchase(buyCredits100, 100);
-        attachCreditPurchase(buyCredits1000, 1000);
-        attachCreditPurchase(buyCredits10000, 10000);
-
-        if (buyProInlineBtn) {
-            buyProInlineBtn.addEventListener('click', () => startProCheckout(buyProInlineBtn));
-        }
-    }
-
-    function resetAssets() {
-        state.captions = [];
-        if (state.images.length) {
-            state.images.forEach((item) => URL.revokeObjectURL(item.url));
-        }
-        state.images = [];
-        if (state.logo?.url) URL.revokeObjectURL(state.logo.url);
-        state.logo = null;
-        state.overrides = {};
-        renderImageThumbs();
-        renderLogoThumb();
-        updateCountsAndSync();
-    }
-
-    function dataUrlToFile(dataUrl, filename) {
-        const [meta, b64] = dataUrl.split(',');
-        const mime = (meta.match(/:(.*?);/) || [])[1] || 'image/png';
-        const binary = atob(b64);
-        const len = binary.length;
-        const buffer = new Uint8Array(len);
-        for (let i = 0; i < len; i++) buffer[i] = binary.charCodeAt(i);
-        return new File([buffer], filename, { type: mime });
-    }
-
-    function addImageFromDataUrl(dataUrl, filename) {
-        return new Promise((resolve, reject) => {
-            try {
-                const file = dataUrlToFile(dataUrl, filename);
-                const url = URL.createObjectURL(file);
-                const img = new Image();
-                img.onload = () => {
-                    state.images.push({ file, url, img });
-                    renderImageThumbs();
-                    updateCountsAndSync();
-                    resolve();
-                };
-                img.onerror = () => reject(new Error('Failed to load generated image'));
-                img.src = url;
-            } catch (err) {
-                reject(err);
-            }
-        });
-    }
-
-    function setLogoFromDataUrl(dataUrl, filename) {
-        return new Promise((resolve, reject) => {
-            try {
-                const file = dataUrlToFile(dataUrl, filename);
-                if (state.logo?.url) URL.revokeObjectURL(state.logo.url);
-                const url = URL.createObjectURL(file);
-                const img = new Image();
-                img.onload = () => {
-                    state.logo = { file, url, img };
-                    renderLogoThumb();
-                    updateCountsAndSync();
-                    resolve();
-                };
-                img.onerror = () => reject(new Error('Failed to load generated logo'));
-                img.src = url;
-            } catch (err) {
-                reject(err);
-            }
         });
     }
 
@@ -1085,34 +886,21 @@
 
         closePaywallBtn.addEventListener('click', () => paywallModal.classList.add('hidden'));
         
-        buyProBtn.addEventListener('click', () => startProCheckout(buyProBtn));
-    }
-
-    async function startProCheckout(buttonEl) {
-        if (!state.token) {
-            showAuthModal('Sign in to subscribe');
-            return;
-        }
-        const originalLabel = buttonEl ? buttonEl.textContent : null;
-        if (buttonEl) {
-            buttonEl.disabled = true;
-            buttonEl.textContent = 'Loading Stripe...';
-        }
-        try {
-            const resp = await fetch(`${state.apiPrefix}/create-checkout-session`, {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${state.token}` }
-            });
-            const data = await resp.json();
-            if (!resp.ok) throw new Error(data.error);
-            window.location.href = data.url;
-        } catch (err) {
-            showToast('Checkout Error: ' + err.message, 'error');
-            if (buttonEl) {
-                buttonEl.disabled = false;
-                buttonEl.textContent = originalLabel || 'Buy Pro Now';
+        buyProBtn.addEventListener('click', async () => {
+            buyProBtn.disabled = true; buyProBtn.textContent = 'Loading Stripe...';
+            try {
+                const resp = await fetch(`${state.apiPrefix}/create-checkout-session`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${state.token}` }
+                });
+                const data = await resp.json();
+                if (!resp.ok) throw new Error(data.error);
+                window.location.href = data.url;
+            } catch (err) {
+                showToast('Checkout Error: ' + err.message, 'error');
+                buyProBtn.disabled = false; buyProBtn.textContent = 'Buy Pro Now';
             }
-        }
+        });
     }
 
     function showAuthModal(message = null) {
@@ -1160,12 +948,6 @@
         } catch(e) {}
     }
 
-    function updateCreditsUI() {
-        if (!creditsBalance) return;
-        const credits = state.user?.credits ?? 0;
-        creditsBalance.textContent = credits;
-    }
-
     function updateAuthUI() {
         if (state.user) {
             authHeaderBtn.textContent = 'Log Out';
@@ -1176,7 +958,6 @@
                 headerStatus.style.color = '#d8b4fe';
                 headerStatus.style.borderColor = 'rgba(168,85,247,0.3)';
             }
-            updateCreditsUI();
             // Show verification banner if needed
             const banner = document.getElementById('verification-banner');
             if (state.user.email_verified === 0 || state.user.email_verified === false) {
@@ -1192,7 +973,6 @@
             headerStatus.style.color = '';
             headerStatus.style.borderColor = '';
             document.getElementById('verification-banner').classList.add('hidden');
-            updateCreditsUI();
         }
     }
 
